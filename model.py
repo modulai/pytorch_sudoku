@@ -8,8 +8,8 @@ class SudokuSolver(nn.Module):
         self.constraint_mask = constraint_mask.view(1, n * n, 3, n * n, 1)
         self.n = n
         self.hidden1 = hidden1
-        # feature vector is 3 * n for our three constraints
-        # for each input number
+
+        # Feature vector is the 3 constraints
         self.input_size = 3 * n
 
         self.l1 = nn.Linear(self.input_size,
@@ -19,12 +19,7 @@ class SudokuSolver(nn.Module):
                             n, bias=False)
         self.softmax = nn.Softmax(dim=2)
 
-    def update_constraints(self, x):
-        non_zeros = (x == 0).sum(dim=1)
-        for i in range(non_zeros):
-            x[:, i]
-
-    # x is a (batch, s^2, s) tensor
+    # x is a (batch, n^2, n) tensor
     def forward(self, x):
         n = self.n
         bts = x.shape[0]
