@@ -17,7 +17,7 @@ class SudokuSolver(nn.Module):
         self.a1 = nn.ReLU()
         self.l2 = nn.Linear(self.hidden1,
                             n, bias=False)
-        self.softmax = nn.Softmax(dim=2)
+        self.softmax = nn.Softmax(dim=1)
 
     # x is a (batch, n^2, n) tensor
     def forward(self, x):
@@ -25,29 +25,29 @@ class SudokuSolver(nn.Module):
         bts = x.shape[0]
         c = self.constraint_mask
         min_empty = (x.sum(dim=2) == 0).sum(dim=1).max()
-        x_fill = x.clone()
         x_pred = x.clone()
         for a in range(min_empty):
             # score empty numbers
-            constraints = (x_fill.view(bts, 1, 1, n * n, n) * c).sum(dim=3)
+            constraints = (x.view(bts, 1, 1, n * n, n) * c).sum(dim=3)
             # empty cells
-            empty_mask = (x_fill.sum(dim=2) == 0)
-            empty_mask_e = empty_mask.view(bts, n * n, 1)\
-                                     .expand(bts, n * n, n)
-            f = constraints.reshape(bts, n * n, 3 * n).float()
-            s = torch.zeros_like(x_fill)
-            y = torch.zeros_like(x_fill)
+            empty_mask = (x.sum(dim=2) == 0)
+
+            f = constraints.reshape(bts, n * n, 3 * n)
             y_ = self.l2(self.a1(self.l1(f[empty_mask])))
-            y.masked_scatter_(empty_mask_e, y_)
-            s_ = self.softmax(y)[empty_mask]
-            s.masked_scatter_(empty_mask_e, s_)
-            x_pred[empty_mask] = s[empty_mask]
+
+            s_ = self.softmax(y_)
+
+            # Score the rows
+            x_pred[empty_mask] = s_
+
+            s = torch.zeros_like(x_pred)
+            s[empty_mask] = s_
             # find most probable guess
             score, score_pos = s.max(dim=2)
-            num, mmax = score.max(dim=1)
+            mmax = score.max(dim=1)[1]
             # fill it in
             nz = empty_mask.sum(dim=1).nonzero().view(-1)
             mmax_ = mmax[nz]
             ones = torch.ones(nz.shape[0])
-            x_fill.index_put_((nz, mmax_, score_pos[nz, mmax_]), ones)
-        return x_pred, x_fill
+            x.index_put_((nz, mmax_, score_pos[nz, mmax_]), ones)
+        return x_pred, x
